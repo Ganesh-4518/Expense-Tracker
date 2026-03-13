@@ -1,7 +1,12 @@
 import axios from 'axios';
 
-// Dynamic API URL - works on both localhost and network IP
+// Dynamic API URL
 const getApiUrl = () => {
+    // If we have an environment variable for the API URL (e.g. from Vercel), use it
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+    // Otherwise, fall back to localhost for local development
     const hostname = window.location.hostname;
     return `http://${hostname}:5000/api`;
 };
@@ -92,6 +97,30 @@ export const reminderAPI = {
     update: (id, data) => api.put(`/reminders/${id}`, data),
     delete: (id) => api.delete(`/reminders/${id}`),
     markPaid: (id) => api.post(`/reminders/${id}/mark-paid`),
+};
+
+// Recurring Transactions API
+export const recurringAPI = {
+    getAll: () => api.get('/recurring'),
+    create: (data) => api.post('/recurring', data),
+    update: (id, data) => api.put(`/recurring/${id}`, data),
+    delete: (id) => api.delete(`/recurring/${id}`),
+    toggle: (id) => api.patch(`/recurring/${id}/toggle`),
+};
+
+// Analytics API
+export const analyticsAPI = {
+    getMonthlySummary: () => api.get('/analytics/monthly-summary'),
+    getCategoryTrends: (period) => api.get(`/analytics/category-trends?period=${period || 6}`),
+    getTopCategories: (period) => api.get(`/analytics/top-categories?period=${period || 6}`),
+    getStats: () => api.get('/analytics/stats'),
+};
+
+// Profile API
+export const profileAPI = {
+    get: () => api.get('/profile'),
+    update: (data) => api.put('/profile', data),
+    changePassword: (data) => api.put('/profile/password', data),
 };
 
 export default api;

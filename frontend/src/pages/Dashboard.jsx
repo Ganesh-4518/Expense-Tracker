@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { dashboardAPI, incomeAPI, expenseAPI } from '../api/api';
+import { exportToExcel, formatCurrencyForExport, formatDateForExport } from '../utils/exportUtils';
 import { useAuth } from '../context/AuthContext';
-import { exportToExcel, formatDateForExport, formatCurrencyForExport } from '../utils/exportUtils';
 import BudgetOverview from '../components/BudgetOverview';
 import SavingsOverview from '../components/SavingsOverview';
 import UpcomingBills from '../components/UpcomingBills';
+import SettingsButton from '../components/SettingsButton';
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -49,6 +50,67 @@ const Dashboard = () => {
         });
     };
 
+    const handleExportReport = async () => {
+        try {
+            const [incomeRes, expenseRes, dashboardRes] = await Promise.all([
+                incomeAPI.getAll(),
+                expenseAPI.getAll(),
+                dashboardAPI.getOverview()
+            ]);
+
+            const incomeData = incomeRes.data.map(item => ({
+                Title: item.title,
+                Amount: formatCurrencyForExport(item.amount),
+                Category: item.category,
+                Date: formatDateForExport(item.date),
+                Description: item.description || ''
+            }));
+
+            const expenseData = expenseRes.data.map(item => ({
+                Title: item.title,
+                Amount: formatCurrencyForExport(item.amount),
+                Category: item.category,
+                Date: formatDateForExport(item.date),
+                Description: item.description || ''
+            }));
+
+            const columns = [
+                { key: 'Title', label: 'Title' },
+                { key: 'Amount', label: 'Amount (₹)' },
+                { key: 'Category', label: 'Category' },
+                { key: 'Date', label: 'Date' },
+                { key: 'Description', label: 'Description' }
+            ];
+
+            const summary = dashboardRes.data.summary;
+
+            const sheets = [
+                { name: 'Income', data: incomeData, columns },
+                { name: 'Expenses', data: expenseData, columns },
+                {
+                    name: 'Summary',
+                    data: [{
+                        Label: 'Total Income',
+                        Value: formatCurrencyForExport(summary.totalIncome)
+                    }, {
+                        Label: 'Total Expense',
+                        Value: formatCurrencyForExport(summary.totalExpense)
+                    }, {
+                        Label: 'Balance',
+                        Value: formatCurrencyForExport(summary.balance)
+                    }],
+                    columns: [{ key: 'Label', label: 'Summary' }, { key: 'Value', label: 'Amount (₹)' }]
+                }
+            ];
+
+            const today = new Date().toISOString().split('T')[0];
+            exportToExcel(sheets, `FinanceReport_${today}`);
+        } catch (error) {
+            console.error('Error exporting data:', error);
+            alert('Failed to export data. Please try again.');
+        }
+    };
+
     // Prepare chart data
     const prepareChartData = () => {
         const last7Days = [];
@@ -82,65 +144,7 @@ const Dashboard = () => {
 
     const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#f472b6', '#22d3ee', '#10b981', '#f59e0b', '#ef4444'];
 
-    // Export to Excel function
-    const handleExportReport = async () => {
-        try {
-            // Fetch all income and expense data
-            const [incomeRes, expenseRes] = await Promise.all([
-                incomeAPI.getAll(),
-                expenseAPI.getAll()
-            ]);
 
-            const incomeData = incomeRes.data.map(item => ({
-                Title: item.title,
-                Amount: formatCurrencyForExport(item.amount),
-                Category: item.category,
-                Date: formatDateForExport(item.date),
-                Description: item.description || ''
-            }));
-
-            const expenseData = expenseRes.data.map(item => ({
-                Title: item.title,
-                Amount: formatCurrencyForExport(item.amount),
-                Category: item.category,
-                Date: formatDateForExport(item.date),
-                Description: item.description || ''
-            }));
-
-            const columns = [
-                { key: 'Title', label: 'Title' },
-                { key: 'Amount', label: 'Amount (₹)' },
-                { key: 'Category', label: 'Category' },
-                { key: 'Date', label: 'Date' },
-                { key: 'Description', label: 'Description' }
-            ];
-
-            const sheets = [
-                { name: 'Income', data: incomeData, columns },
-                { name: 'Expenses', data: expenseData, columns },
-                {
-                    name: 'Summary',
-                    data: [{
-                        Label: 'Total Income',
-                        Value: formatCurrencyForExport(data.summary.totalIncome)
-                    }, {
-                        Label: 'Total Expense',
-                        Value: formatCurrencyForExport(data.summary.totalExpense)
-                    }, {
-                        Label: 'Balance',
-                        Value: formatCurrencyForExport(data.summary.balance)
-                    }],
-                    columns: [{ key: 'Label', label: 'Summary' }, { key: 'Value', label: 'Amount (₹)' }]
-                }
-            ];
-
-            const today = new Date().toISOString().split('T')[0];
-            exportToExcel(sheets, `FinanceReport_${today}`);
-        } catch (error) {
-            console.error('Error exporting data:', error);
-            alert('Failed to export data. Please try again.');
-        }
-    };
 
     if (loading) {
         return (
@@ -152,19 +156,22 @@ const Dashboard = () => {
 
     return (
         <div>
-            <div className="dashboard-header">
+            <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 className="dashboard-title">Welcome back, {user?.name?.split(' ')[0]}! 👋</h1>
                     <p className="dashboard-subtitle">Here's your financial overview</p>
                 </div>
-                <button className="btn btn-secondary" onClick={handleExportReport}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    Export Report
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button onClick={handleExportReport} className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card)' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        <span>Export Report</span>
+                    </button>
+                    <SettingsButton />
+                </div>
             </div>
 
             {/* Stats Cards */}

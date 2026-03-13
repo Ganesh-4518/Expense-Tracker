@@ -12,6 +12,9 @@ import Expense from './pages/Expense';
 import Budgets from './pages/Budgets';
 import Savings from './pages/Savings';
 import Reminders from './pages/Reminders';
+import RecurringTransactions from './pages/RecurringTransactions';
+import Analytics from './pages/Analytics';
+import Profile from './pages/Profile';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -125,6 +128,30 @@ function App() {
                             element={
                                 <ProtectedRoute>
                                     <Reminders />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/recurring"
+                            element={
+                                <ProtectedRoute>
+                                    <RecurringTransactions />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/analytics"
+                            element={
+                                <ProtectedRoute>
+                                    <Analytics />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/profile"
+                            element={
+                                <ProtectedRoute>
+                                    <Profile />
                                 </ProtectedRoute>
                             }
                         />

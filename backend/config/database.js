@@ -1,13 +1,19 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'finance_tracker',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
-});
+// Support DATABASE_URL (for cloud like Neon/Render) or individual vars (for local dev)
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  })
+  : new Pool({
+    user: process.env.DB_USER || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    database: process.env.DB_NAME || 'finance_tracker',
+    password: process.env.DB_PASSWORD || 'Raj@123',
+    port: process.env.DB_PORT || 5432,
+  });
 
 // Initialize database tables
 const initDatabase = async () => {
@@ -111,6 +117,26 @@ const initDatabase = async () => {
     `);
 
     console.log('✅ Database tables initialized successfully');
+
+    // Create recurring_transactions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS recurring_transactions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(100) NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        category VARCHAR(50),
+        type VARCHAR(10) NOT NULL CHECK (type IN ('income', 'expense')),
+        frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'yearly')),
+        start_date DATE NOT NULL,
+        next_run_date DATE NOT NULL,
+        is_active BOOLEAN DEFAULT true,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    console.log('✅ Recurring transactions table ready');
   } catch (error) {
     console.error('❌ Error initializing database:', error.message);
   }

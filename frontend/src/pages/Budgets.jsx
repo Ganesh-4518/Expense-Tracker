@@ -202,8 +202,11 @@ const Budgets = () => {
                                 />
                             </div>
                             <div className="budget-card-footer">
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem' }}>
-                                    {budget.percentage}% used • {formatCurrency(Math.max(parseFloat(budget.amount) - (budget.spent || 0), 0))} remaining
+                                <span style={{ color: budget.percentage > 100 ? '#ef4444' : 'var(--text-secondary)', fontSize: '0.8125rem', fontWeight: budget.percentage > 100 ? 600 : 400 }}>
+                                    {budget.percentage > 100
+                                        ? `⚠️ Over by ${formatCurrency(budget.spent - parseFloat(budget.amount))}`
+                                        : `${budget.percentage}% used • ${formatCurrency(parseFloat(budget.amount) - (budget.spent || 0))} remaining`
+                                    }
                                 </span>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <button className="btn-icon" onClick={() => handleEdit(budget)} title="Edit">
