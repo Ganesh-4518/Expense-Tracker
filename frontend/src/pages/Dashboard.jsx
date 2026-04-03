@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { dashboardAPI, incomeAPI, expenseAPI } from '../api/api';
+import { dashboardAPI, incomeAPI, expenseAPI, analyticsAPI } from '../api/api';
 import { exportToExcel, formatCurrencyForExport, formatDateForExport } from '../utils/exportUtils';
 import { useAuth } from '../context/AuthContext';
 import BudgetOverview from '../components/BudgetOverview';
@@ -18,6 +18,8 @@ const Dashboard = () => {
         recentTransactions: [],
         categoryData: { income: [], expense: [] }
     });
+    const [yearlyData, setYearlyData] = useState([]);
+    const [chartPeriod, setChartPeriod] = useState('weekly'); // 'weekly', 'monthly', 'yearly'
 
     useEffect(() => {
         fetchDashboardData();
@@ -25,8 +27,12 @@ const Dashboard = () => {
 
     const fetchDashboardData = async () => {
         try {
-            const response = await dashboardAPI.getData();
-            setData(response.data);
+            const [dashboardRes, analyticsRes] = await Promise.all([
+                dashboardAPI.getData(),
+                analyticsAPI.getMonthlySummary()
+            ]);
+            setData(dashboardRes.data);
+            setYearlyData(analyticsRes.data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
         } finally {
@@ -58,21 +64,21 @@ const Dashboard = () => {
                 dashboardAPI.getOverview()
             ]);
 
-            const incomeData = incomeRes.data.map(item => ({
-                Title: item.title,
+            const incomeData = incomeRes.data?.map(item => ({
+                Title: item.title || '',
                 Amount: formatCurrencyForExport(item.amount),
-                Category: item.category,
+                Category: item.category || '',
                 Date: formatDateForExport(item.date),
                 Description: item.description || ''
-            }));
+            })) || [];
 
-            const expenseData = expenseRes.data.map(item => ({
-                Title: item.title,
+            const expenseData = expenseRes.data?.map(item => ({
+                Title: item.title || '',
                 Amount: formatCurrencyForExport(item.amount),
-                Category: item.category,
+                Category: item.category || '',
                 Date: formatDateForExport(item.date),
                 Description: item.description || ''
-            }));
+            })) || [];
 
             const columns = [
                 { key: 'Title', label: 'Title' },
@@ -111,10 +117,20 @@ const Dashboard = () => {
         }
     };
 
-    // Prepare chart data
+    // Prepare chart data based on selected period
     const prepareChartData = () => {
-        const last7Days = [];
-        for (let i = 6; i >= 0; i--) {
+        if (chartPeriod === 'yearly') {
+            return yearlyData.map(item => ({
+                date: item.label.split(' ')[0], // e.g., "Jan", "Feb"
+                income: item.income,
+                expense: item.expense
+            }));
+        }
+
+        const daysToKeep = chartPeriod === 'weekly' ? 7 : 30;
+        const result = [];
+
+        for (let i = daysToKeep - 1; i >= 0; i--) {
             const date = new Date();
             date.setDate(date.getDate() - i);
             const dateStr = date.toISOString().split('T')[0];
@@ -122,13 +138,15 @@ const Dashboard = () => {
             const incomeEntry = data.dailyData.income.find(d => d.day?.split('T')[0] === dateStr);
             const expenseEntry = data.dailyData.expense.find(d => d.day?.split('T')[0] === dateStr);
 
-            last7Days.push({
-                date: date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' }),
+            result.push({
+                date: chartPeriod === 'weekly'
+                    ? date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' })
+                    : date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
                 income: parseFloat(incomeEntry?.total || 0),
                 expense: parseFloat(expenseEntry?.total || 0)
             });
         }
-        return last7Days;
+        return result;
     };
 
     // Prepare expense category data for pie chart
@@ -213,11 +231,72 @@ const Dashboard = () => {
             {/* Charts Section */}
             <div className="chart-section">
                 <div className="chart-card">
-                    <h3 className="chart-title">📈 Last 7 Days Activity</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                        <h3 className="chart-title" style={{ margin: 0 }}>📈 Activity Overview</h3>
+                        <div className="chart-filters" style={{ display: 'flex', background: 'var(--bg-primary)', padding: '0.25rem', borderRadius: 'var(--border-radius-sm)' }}>
+                            <button
+                                onClick={() => setChartPeriod('weekly')}
+                                className={`period-btn ${chartPeriod === 'weekly' ? 'active' : ''}`}
+                                style={{
+                                    padding: '0.35rem 0.75rem',
+                                    fontSize: '0.8125rem',
+                                    border: 'none',
+                                    background: chartPeriod === 'weekly' ? 'var(--gradient-primary)' : 'transparent',
+                                    color: chartPeriod === 'weekly' ? 'white' : 'var(--text-secondary)',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: chartPeriod === 'weekly' ? '600' : '500',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Weekly
+                            </button>
+                            <button
+                                onClick={() => setChartPeriod('monthly')}
+                                className={`period-btn ${chartPeriod === 'monthly' ? 'active' : ''}`}
+                                style={{
+                                    padding: '0.35rem 0.75rem',
+                                    fontSize: '0.8125rem',
+                                    border: 'none',
+                                    background: chartPeriod === 'monthly' ? 'var(--gradient-primary)' : 'transparent',
+                                    color: chartPeriod === 'monthly' ? 'white' : 'var(--text-secondary)',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: chartPeriod === 'monthly' ? '600' : '500',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Monthly
+                            </button>
+                            <button
+                                onClick={() => setChartPeriod('yearly')}
+                                className={`period-btn ${chartPeriod === 'yearly' ? 'active' : ''}`}
+                                style={{
+                                    padding: '0.35rem 0.75rem',
+                                    fontSize: '0.8125rem',
+                                    border: 'none',
+                                    background: chartPeriod === 'yearly' ? 'var(--gradient-primary)' : 'transparent',
+                                    color: chartPeriod === 'yearly' ? 'white' : 'var(--text-secondary)',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: chartPeriod === 'yearly' ? '600' : '500',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Yearly
+                            </button>
+                        </div>
+                    </div>
                     <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={prepareChartData()}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                            <XAxis dataKey="date" stroke="#a1a1aa" fontSize={12} />
+                            <XAxis
+                                dataKey="date"
+                                stroke="#a1a1aa"
+                                fontSize={12}
+                                minTickGap={20}
+                                tickMargin={10}
+                            />
                             <YAxis stroke="#a1a1aa" fontSize={12} />
                             <Tooltip
                                 contentStyle={{

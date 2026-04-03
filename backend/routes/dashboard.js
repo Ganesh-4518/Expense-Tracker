@@ -25,20 +25,20 @@ router.get('/', async (req, res) => {
         );
         const totalExpense = parseFloat(totalExpenseResult.rows[0].total);
 
-        // Get last 7 days income data
+        // Get last 30 days income data
         const incomeByDay = await pool.query(`
       SELECT DATE(date) as day, COALESCE(SUM(amount), 0) as total
       FROM incomes 
-      WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '7 days'
+      WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY DATE(date)
       ORDER BY day ASC
     `, [req.user.id]);
 
-        // Get last 7 days expense data
+        // Get last 30 days expense data
         const expenseByDay = await pool.query(`
       SELECT DATE(date) as day, COALESCE(SUM(amount), 0) as total
       FROM expenses 
-      WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '7 days'
+      WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY DATE(date)
       ORDER BY day ASC
     `, [req.user.id]);

@@ -68,6 +68,7 @@ export const expenseAPI = {
 // Dashboard API
 export const dashboardAPI = {
     getData: () => api.get('/dashboard'),
+    getOverview: () => api.get('/dashboard'),
 };
 
 // Budget API
